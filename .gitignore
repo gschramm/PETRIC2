@@ -19,3 +19,4 @@ __pycache__/
 events.*
 
 main.py
+*.png

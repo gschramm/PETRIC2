@@ -117,8 +117,8 @@ def get_data(srcdir, outdir, sirf_verbosity=0, read_sinos=True):
 
 
 if __name__ == "__main__":
-    #srcdir  = Path("/mnt/share/petric") / "Siemens_mMR_NEMA_IQ"
-    srcdir  = Path("/mnt/share/petric") / "NeuroLF_Hoffman_Dataset"
+    srcdir  = Path("/mnt/share/petric") / "Siemens_mMR_NEMA_IQ"
+    #srcdir  = Path("/mnt/share/petric") / "NeuroLF_Hoffman_Dataset"
     data = get_data(srcdir=srcdir, outdir=Path("."), sirf_verbosity=1)
 
     sirf_prior = data.prior  
@@ -132,3 +132,17 @@ if __name__ == "__main__":
     diagH_prior_stir = stir_initial.clone()
     stir_prior.compute_Hessian_diagonal(diagH_prior_stir, stir_initial)
     diagH_prior_sirf = stir_to_sirf(diagH_prior_stir)
+
+    import array_api_compat.cupy as cp
+    import pymirc.viewer as pv
+    from rdp import RDP
+
+    cp_prior = RDP(initial.shape, cp, cp.cuda.Device(0), cp.asarray(initial.spacing), sirf_prior.get_epsilon())
+    cp_prior.kappa = cp.asarray(sirf_prior.get_kappa().asarray())
+    cp_prior.scale = sirf_prior.get_penalisation_factor()
+
+    diagH_prior_cp = cp.asnumpy(cp_prior.diag_hessian(cp.asarray(initial.asarray())))
+
+    vi = pv.ThreeAxisViewer([diagH_prior_sirf.asarray(), diagH_prior_cp, diagH_prior_cp - diagH_prior_sirf.asarray()],
+                            imshow_kwargs= 2*[dict(vmax=1e5)] + [dict(vmax=1e1, vmin=-1e1, cmap = "seismic")],)
+    vi.fig.savefig(f"zz_rdp_hess_{srcdir.name}.png")
