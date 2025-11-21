@@ -1,0 +1,8 @@
+channels: 
+  - conda-forge
+
+dependencies:
+  - array-api-compat
+  - cupy
+  - ipython
+  - pymirc
