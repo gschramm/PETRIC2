@@ -117,6 +117,11 @@ def get_data(srcdir, outdir, sirf_verbosity=0, read_sinos=True):
 
 
 if __name__ == "__main__":
+    import array_api_compat.cupy as cp
+    import pymirc.viewer as pv
+    from rdp import RDP
+    from time import time
+
     srcdir  = Path("/mnt/share/petric") / "Siemens_mMR_NEMA_IQ"
     #srcdir  = Path("/mnt/share/petric") / "NeuroLF_Hoffman_Dataset"
     data = get_data(srcdir=srcdir, outdir=Path("."), sirf_verbosity=1)
@@ -125,23 +130,27 @@ if __name__ == "__main__":
     initial = data.OSEM_image
 
     # construct the RDP in STIR
-    stir_initial = sirf_to_stir(initial)
     stir_prior = construct_stir_RDP(sirf_prior, initial)
 
     # compute the diagonal of the prior Hessian
+    t0 = time()
+    stir_initial = sirf_to_stir(initial)
     diagH_prior_stir = stir_initial.clone()
     stir_prior.compute_Hessian_diagonal(diagH_prior_stir, stir_initial)
     diagH_prior_sirf = stir_to_sirf(diagH_prior_stir)
+    t1 = time()
 
-    import array_api_compat.cupy as cp
-    import pymirc.viewer as pv
-    from rdp import RDP
 
     cp_prior = RDP(initial.shape, cp, cp.cuda.Device(0), cp.asarray(initial.spacing), sirf_prior.get_epsilon())
     cp_prior.kappa = cp.asarray(sirf_prior.get_kappa().asarray())
     cp_prior.scale = sirf_prior.get_penalisation_factor()
 
+    t2 = time()
     diagH_prior_cp = cp.asnumpy(cp_prior.diag_hessian(cp.asarray(initial.asarray())))
+    t3 = time()
+
+    print(f"STIR RDP Hessian diagonal computation time: {t1 - t0:.2f} s")
+    print(f"CuPy RDP Hessian diagonal computation time: {t3 - t2:.2f} s")
 
     vi = pv.ThreeAxisViewer([diagH_prior_sirf.asarray(), diagH_prior_cp, diagH_prior_cp - diagH_prior_sirf.asarray()],
                             imshow_kwargs= 2*[dict(vmax=1e5)] + [dict(vmax=1e1, vmin=-1e1, cmap = "seismic")],)
