@@ -158,22 +158,14 @@ if __name__ == "__main__":
 
     tot_act = u_cp.sum()
 
-    for i_outer in range(5):
-        # init x
-        x_cp = u_cp
-        for i_inner in range(10):
-            nom = (x_cp - u_cp) + r_cp * cp_prior.gradient(x_cp)
-            denom = 1 + r_cp * cp_prior.diag_hessian(x_cp)
-            x_cp -= 0.5*(nom / denom)
-            x_cp = cp.nan_to_num(x_cp, nan=0.0, posinf=None, neginf=None)
-            print(i_outer, i_inner, x_cp.min(), x_cp.max())
-        
-        u_cp = cp.clip(x_cp, 0, None)
-        u_cp *= tot_act / u_cp.sum()
-
-        r_cp = u_cp / back_ones_cp
-        r_cp = cp.nan_to_num(r_cp, nan=0.0, posinf=None, neginf=None)
-
+    # init x
+    x_cp = u_cp
+    for i_inner in range(200):
+        nom = (x_cp - u_cp) + r_cp * cp_prior.gradient(x_cp)
+        denom = 1 + r_cp * cp_prior.diag_hessian(x_cp)
+        x_cp -= 0.5*(nom / denom)
+        x_cp = cp.clip(cp.nan_to_num(x_cp, nan=0.0, posinf=None, neginf=None), 0, None)
+        print(i_inner, x_cp.min(), x_cp.max())
     
     ############################################################################
     x_np = cp.asnumpy(x_cp)
